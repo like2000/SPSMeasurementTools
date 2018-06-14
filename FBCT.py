@@ -20,7 +20,7 @@ class FBCT:
         os.remove(temp_filename)
 
         self.time_vect = np.float_(np.squeeze(dict_fbct['measStamp']))*1e-3
-        self.fbct_mat = dict_fbct['bunchIntensityFast']
+        self.fbct_mat = np.array(dict_fbct['bunchIntensityFast'], dtype=np.float64)
 
     def profile(self, t_obs, get_next_after_tobs=False):
         if not get_next_after_tobs:

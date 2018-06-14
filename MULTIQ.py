@@ -1,4 +1,4 @@
-from sddsdata import sddsdata
+from .sddsdata import sddsdata
 import numpy as np
 import scipy.io as sio
 import os
@@ -6,8 +6,8 @@ import shutil
 import time
 import datetime
 import glob
-from zip_mat import save_zip
-import timestamp_helpers as th
+from .zip_mat import save_zip
+from . import timestamp_helpers as th
 import gzip
 import matplotlib.pyplot as pl
 
@@ -24,8 +24,8 @@ class MultiQ(object):
 		elif complete_path.endswith('.mat'):
 			dict_multiq = sio.loadmat(complete_path)
 		else:
-			print('Unknown file extension for MultiQ file. Should be ' +
-			      '.mat or .mat.gz')
+			print(('Unknown file extension for MultiQ file. Should be ' +
+			      '.mat or .mat.gz'))
 
 		self.rawData_H = dict_multiq['rawData_H']
 		self.rawData_V = dict_multiq['rawData_V']
@@ -42,7 +42,7 @@ class MultiQ(object):
 		elif plane=='V':
 			rawData = self.rawData_V
 		else:
-			print 'unknown plane argument'
+			print('unknown plane argument')
 			return -1
 
 		n_meas, n_turns = rawData.shape
@@ -74,7 +74,7 @@ def sdds_to_dict(in_complete_path):
 	try:
 		temp = sddsdata(in_complete_path, endian='little', full=True)
 	except IndexError:
-		print 'Failed to open data file. (save_multiq_mat)'
+		print('Failed to open data file. (save_multiq_mat)')
 		return
 	data = temp.data[0]
 
@@ -110,7 +110,7 @@ def sdds_to_dict(in_complete_path):
 	t_stamp_unix = float(data['timestampSecond'])+float(data['timestampMilliSecond'])*1e-3
 	rawData_H=[]
 	rawData_V=[]
-	for ii in xrange(int(nbOfMeas)):
+	for ii in range(int(nbOfMeas)):
 		rawData_H.append(data['rawData-H-%d'%(ii+1)])
 		rawData_V.append(data['rawData-V-%d'%(ii+1)])
 
@@ -163,7 +163,7 @@ def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='
 	out_complete_path = outp_folder + us_string +'/'+ out_filename
 
 	if not os.path.isdir(outp_folder + us_string):
-		print 'I create folder: '+ outp_folder + us_string
+		print('I create folder: '+ outp_folder + us_string)
 		os.makedirs(outp_folder + us_string)
 
 	sio.savemat(out_complete_path, dict_meas, oned_as='row')
@@ -205,7 +205,7 @@ def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS
 		sdds_folder_list.extend(glob.glob(data_folder + date_string))
 
 	for sdds_folder in sdds_folder_list:
-		print '\nConverting data in folder: %s\n'%sdds_folder
+		print('\nConverting data in folder: %s\n'%sdds_folder)
 		file_list = os.listdir(sdds_folder)
 	
 		for filename in file_list:
@@ -225,14 +225,14 @@ def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS
 
 			try:
 				complete_path = sdds_folder + '/' + filename
-				print complete_path
+				print(complete_path)
 
 				sdds_to_file(complete_path)
 				with open(filename_converted, 'a+') as fid:
 					fid.write(filename+'\n')
 			except Exception as err:
-				print 'Skipped:'
-				print complete_path
-				print 'Got exception:'
-				print err
+				print('Skipped:')
+				print(complete_path)
+				print('Got exception:')
+				print(err)
 			

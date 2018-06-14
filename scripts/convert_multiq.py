@@ -3,5 +3,7 @@ from SPSMeasurementTools import MULTIQ
 
 start_time = '2015_04_17 02:45:00'
 end_time = '2015_04_17 03:25:00'
+start_time = '2018_06_11 14:20:00'
+end_time = '2018_06_11 14:30:00'
 
 MULTIQ.make_mat_files(start_time, end_time)

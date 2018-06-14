@@ -44,7 +44,8 @@ class TrimDataSet(object):
         else:
             tstamp_unix = t
         trim_t_stamps = self.trim_t_stamps[self.trim_t_stamps>0]
-        indx_before_t = np.searchsorted(trim_t_stamps - tstamp_unix,0) - 1
+        indx_before_t = np.searchsorted(trim_t_stamps - tstamp_unix, 0) - 1
+        # import pdb; pdb.set_trace()
         if indx_before_t < 0:
             print('ERROR: The requested time is before the first trim!')
             return None

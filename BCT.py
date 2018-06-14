@@ -1,36 +1,43 @@
-from sddsdata import sddsdata
-import numpy as np
-import scipy.io as sio
-import os
-import shutil
-import gzip
-import time
-import glob
 import pickle
+import glob, gzip
+import os, shutil, time
+
+import numpy as np
+import pandas as pd
+import scipy.io as sio
+
 from zip_mat import save_zip
+from sddsdata import sddsdata
 import timestamp_helpers as th
 
 
 class BCT:
 	def __init__(self, complete_path):
-		temp_filename = complete_path.split('.gz')[0] + 'uzipd'
+
+                temp_filename = complete_path.split('.gz')[0] + 'uzipd'
 		with open(temp_filename, "wb") as tmp:
 			shutil.copyfileobj(gzip.open(complete_path), tmp)
 		dict_bct = sio.loadmat(temp_filename)
 		os.remove(temp_filename)
 
 		intens_exponent = np.float_(np.squeeze(dict_bct['totalIntensity_unitExponent']))
+		time_start_cycle_string = dict_bct['cycleTime'].astype(np.str).tostring().replace('\n', '').strip('"')
 
-		self.total_intensity = np.squeeze(dict_bct['totalIntensity'])*10**(intens_exponent)
 		self.SPSuser = str(np.squeeze(dict_bct['SPSuser']))
 		self.SC_numb = np.int_(np.squeeze(dict_bct['superCycleNb']))
+                self.total_intensity = np.squeeze(dict_bct['totalIntensity'])*10**(intens_exponent)
 
-		time_start_cycle_string = dict_bct['cycleTime']
-		time_start_cycle_string = time_start_cycle_string.tolist()[0]
-		time_start_cycle_string = time_start_cycle_string.split('.')[0]
-		time_start_cycle_struct = time.strptime(time_start_cycle_string, '"%Y/%m/%d %H:%M:%S')
-		self.time_start_cycle_float = time.mktime(time_start_cycle_struct)
+		# time_start_cycle_string = time_start_cycle_string.tolist()[0]
+		# time_start_cycle_string = time_start_cycle_string.split('.')[0]
+		# time_start_cycle_struct = time.strptime(time_start_cycle_string, '"%Y/%m/%d %H:%M:%S')
+                # self.time_start_cycle_string = dict_bct['cycleTime']
+		# self.time_start_cycle_float = time.mktime(time_start_cycle_struct)
 		self.time_vect = np.squeeze(dict_bct['measStamp']*10**np.float_(np.squeeze(dict_bct['measStamp_unitExponent'])))
+                if len(self.time_vect) > len(self.total_intensity):
+                   self.time_vect = self.time_vect[:len(self.total_intensity)]
+
+                self.time_start_cycle_float = (pd.to_datetime(time_start_cycle_string, format="%Y/%m/%d %H:%M:%S.%f")
+                                               + pd.to_timedelta('2 hours')).value
 
 	def max_inten(self):
 		return np.max(self.total_intensity)
@@ -121,7 +128,6 @@ def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj
 
 
 def sdds_to_dict(in_complete_path):
-	us_string = in_complete_path.split('.')[-2]
 
 	try:
 		temp = sddsdata(in_complete_path, endian='little', full=True)
@@ -129,52 +135,77 @@ def sdds_to_dict(in_complete_path):
 		print 'Failed to open data file. (save_bct_mat)'
 		return
 	data = temp.data[0]
+        
 
+        try:
+                dict_meas = {
+	                'acqDesc': data['acqDesc'].tostring(),
+	                'acqMsg': data['acqMsg'].tostring(),
+	                'acqState': np.int_(data['acqState']),
+	                'acqTime': data['acqTime'].tostring(),
+	                'measStamp': data['measStamp'],
+	                'measStamp_unit': np.int_(data['measStamp_unit']),
+	                'measStamp_unitExponent': np.float_(data['measStamp_unitExponent']),
+	                'nbOfMeas': np.int_(data['nbOfMeas']),
+	                'observables': np.int_(data['observables']),
+	                'propType': np.int_(data['propType']),
+	                'samplingTime': np.int_(data['samplingTime']),
+	                'sbfIntensity': np.float_(data['sbfIntensity']),
+	                'superCycleNb': np.int_(data['superCycleNb']),
+	                'totalIntensity': data['totalIntensity'],
+	                'totalIntensity_unit': np.int_(data['totalIntensity_unit']),
+	                'totalIntensity_unitExponent': np.int_(data['totalIntensity_unitExponent']),
+        	        'deviceName': ((data['deviceName'].tostring()).split('\n')[0]).split('SPS.')[-1],
+                        'beamID': np.int_(data['beamID']),
+                        'cycleTime': data['cycleTime'].tostring(),
+                }
+        except KeyError as err:
+                print(err.message)
+                print("This looks like a post October 2017 SDDS... will try to adapt.")
+
+                # import pdb; pdb.set_trace()
+                dict_meas = {
+			'calMarkerData': data['calMarkerData'],
+			'inCheckStatusData': data['inCheckStatusData'],
+			'range1Data': data['range1Data'],
+			'range2Data': data['range2Data'],
+			'range3Data': data['range3Data'],
+			'totalIntensity': data['totalIntensity'],
+			'totalIntensity4Ranges': data['totalIntensity4Ranges'],
+		        'acqMsg': data['acqMsg'],
+		        'acqState': data['acqState'],
+		        'acqTime': data['acqTime'],
+		        'cycleTime': data['cycleTime'],
+		        'dumpCycleTime': data['dumpCycleTime'],
+		        'dumpInt': data['dumpInt'],
+		        'measStamp_unit': np.int_(data['measStamp_unit']),
+		        'measStamp_unitExponent': data['measStamp_unitExponent'],
+		        'nbOfAdcData': np.int_(data['nbOfAdcData']),
+		        'nbOfMeas': data['nbOfMeas'],
+		        'samplingTime': data['samplingTime'],
+		        'sbfCycleTime': data['sbfCycleTime'],
+		        'sbfIntensity': data['sbfIntensity'],
+		        'selectedRange': data['selectedRange'],
+		        'slowCycleTime': data['slowCycleTime'],
+		        'slowExtInt': data['slowExtInt'],
+		        'superCycleNb': data['superCycleNb'],
+		        'totalIntensity_unit': data['totalIntensity_unit'],
+		        'totalIntensity_unitExponent': data['totalIntensity_unitExponent'],
+		        'vmodStatus': data['vmodStatus'],
+                        'acqDesc': data['acqDesc'],
+                        'beamID': 0,
+                        'deviceName': data['acqMsg'].tostring().replace('\n', '').strip('"').split(':')[-1].split('SPS.')[-1],
+                        'lowIbStatusData': data['lowIbStatusData'],
+                        'measStamp': data['measStamp'],
+                        'range4Data': data['range4Data'],
+                }
+
+
+        us_string = in_complete_path.split('.')[-2]
 	cycleTime = data['cycleTime'].tostring()
 	t_stamp_unix = time.mktime(time.strptime(cycleTime.replace('"', '').replace('\n','').split('.')[0], '%Y/%m/%d %H:%M:%S'))
-
-	beamID = np.int_(data['beamID'])
-	deviceName = ((data['deviceName'].tostring()).split('\n')[0]).split('SPS.')[-1]
-	sbfIntensity = np.float_(data['sbfIntensity'])
-	acqState = np.int_(data['acqState'])
-	totalIntensity = data['totalIntensity']
-	acqTime = data['acqTime'].tostring()
-	propType = np.int_(data['propType'])
-	totalIntensity_unitExponent = np.int_(data['totalIntensity_unitExponent'])
-	measStamp_unitExponent = np.float_(data['measStamp_unitExponent'])
-	samplingTime = np.int_(data['samplingTime'])
-	measStamp_unit = np.int_(data['measStamp_unit'])
-	observables = np.int_(data['observables'])
-	nbOfMeas = np.int_(data['nbOfMeas'])
-	superCycleNb = np.int_(data['superCycleNb'])
-	acqMsg = data['acqMsg'].tostring()
-	measStamp = data['measStamp']
-	acqDesc = data['acqDesc'].tostring()
-	totalIntensity_unit = np.int_(data['totalIntensity_unit'])
-
-	dict_meas = {
-		'beamID':beamID,
-		'deviceName':deviceName,
-		'sbfIntensity':sbfIntensity,
-		'acqState':acqState,
-		'totalIntensity':totalIntensity,
-		'acqTime':acqTime,
-		'propType':propType,
-		'totalIntensity_unitExponent':totalIntensity_unitExponent,
-		'measStamp_unitExponent':measStamp_unitExponent,
-		'samplingTime':samplingTime,
-		'measStamp_unit':measStamp_unit,
-		'observables':observables,
-		'nbOfMeas':nbOfMeas,
-		'superCycleNb':superCycleNb,
-		'cycleTime':cycleTime,
-		'acqMsg':acqMsg,
-		'measStamp':measStamp,
-		'acqDesc':acqDesc,
-		'totalIntensity_unit':totalIntensity_unit,
-		'SPSuser':us_string,
-		't_stamp_unix':t_stamp_unix
-			}
+        dict_meas['SPSuser'] = us_string
+        dict_meas['t_stamp_unix'] = t_stamp_unix
 
 	return dict_meas
 
@@ -200,64 +231,72 @@ def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='
 def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS_DATA/OP_DATA/SPS_BCT/',
 		   device_name=None, SPSuser=None, filename_converted='bct_converted.txt'):
 
-	if type(start_time) is str:
-		start_tstamp_unix = th.localtime2unixstamp(start_time)
+    if type(start_time) is str:
+	start_tstamp_unix = th.localtime2unixstamp(start_time)
+    else:
+	start_tstamp_unix = start_time
+
+    if end_time == 'Now':
+	end_tstamp_unix = time.mktime(time.localtime())
+    elif type(end_time) is str:
+	end_tstamp_unix = th.localtime2unixstamp(end_time)
+    else:
+	end_tstamp_unix = end_time
+
+    try:
+	with open(filename_converted, 'r') as fid:
+            list_converted = fid.read().split('\n')
+    except IOError:
+	list_converted = []
+
+    list_date_strings = th.date_strings_interval(start_tstamp_unix, end_tstamp_unix)
+
+    sdds_folder_list = []
+    for date_string in list_date_strings:
+	if device_name == None:
+            sdds_folder_list.extend(glob.glob(data_folder + date_string + '/SPS.BCTDC.*@Acquisition/'))
 	else:
-		start_tstamp_unix = start_time
-
-	if end_time == 'Now':
-		end_tstamp_unix = time.mktime(time.localtime())
-	elif type(end_time) is str:
-		end_tstamp_unix = th.localtime2unixstamp(end_time)
-	else:
-		end_tstamp_unix = end_time
-
-	try:
-		with open(filename_converted, 'r') as fid:
-			list_converted = fid.read().split('\n')
-	except IOError:
-		list_converted = []
-
-	list_date_strings = th.date_strings_interval(start_tstamp_unix, end_tstamp_unix)
-
-	sdds_folder_list = []
-	for date_string in list_date_strings:
-		if device_name == None:
-			sdds_folder_list.extend(glob.glob(data_folder + date_string + '/SPS.BCTDC.*@Acquisition/'))
-		else:
-			device_path = glob.glob(data_folder + date_string + '/SPS.BCTDC.%s*@Acquisition/'%device_name)
-			if len(device_path) == 0:
-				print 'No data for device %s on %s'%(device_name, date_string)
-			else:
-				sdds_folder_list.extend(device_path)
+	    device_path = glob.glob(data_folder + date_string + '/SPS.BCTDC.%s*@Acquisition/'%device_name)
+	    if len(device_path) == 0:
+		print 'No data for device %s on %s'%(device_name, date_string)
+            else:
+		sdds_folder_list.extend(device_path)
 
 
-	for sdds_folder in sdds_folder_list:
-		print '\nConverting data in folder: %s\n'%sdds_folder
-		file_list = os.listdir(sdds_folder)
-		for filename in file_list:
-			tstamp_filename = int(float(filename.split('@')[-2]) / 1e9)
-			if not(tstamp_filename > start_tstamp_unix and tstamp_filename < end_tstamp_unix):
-				continue
+        for sdds_folder in sdds_folder_list:
+                print '\nConverting data in folder: %s\n'%sdds_folder
+                file_list = os.listdir(sdds_folder)
+                for filename in file_list:
+                        tstamp_filename = int(float(filename.split('@')[-2]) / 1e9)
+                        if not(tstamp_filename > start_tstamp_unix and tstamp_filename < end_tstamp_unix):
+                                continue
 
-			if SPSuser != None:
-				user_filename = filename.split('.')[-2]
-				if user_filename != SPSuser:
-					continue
+                        if SPSuser != None:
+                                user_filename = filename.split('.')[-2]
+                                if user_filename != SPSuser:
+                                        continue
 
-			if filename in list_converted:
-				continue
+                        if filename in list_converted:
+                                continue
 
-			try:
-				complete_path = sdds_folder + filename
-				print complete_path
 
-				sdds_to_file(complete_path)
-				with open(filename_converted, 'a+') as fid:
-					fid.write(filename+'\n')
-			except Exception as err:
-				print 'Skipped:'
-				print complete_path
-				print 'Got exception:'
-				print err
+                        complete_path = sdds_folder + filename
+                        print complete_path
+
+                        sdds_to_file(complete_path)
+                        with open(filename_converted, 'a+') as fid:
+                                fid.write(filename+'\n')
+
+                        try:
+                                complete_path = sdds_folder + filename
+                                print complete_path
+
+                                sdds_to_file(complete_path)
+                                with open(filename_converted, 'a+') as fid:
+                                        fid.write(filename+'\n')
+                        except Exception as err:
+                                print 'Skipped:'
+                                print complete_path
+                                print 'Got exception:'
+                                print err
 '''Test'''
